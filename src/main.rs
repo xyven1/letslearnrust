@@ -13,11 +13,12 @@ type Clients = Arc<RwLock<HashMap<String, client::Client>>>;
 
 #[tokio::main]
 async fn main() {
-    match db::sub_key("test".to_string()).await {
+    let clients: Clients = Arc::new(RwLock::new(HashMap::new()));
+
+    match db::global_sub_key(clients.clone(), "test".to_string()).await {
         Ok(_) => println!("Redis Channel Subcribed"),
         Err(e) => println!("{}", e),
     };
-    let clients: Clients = Arc::new(RwLock::new(HashMap::new()));
 
     let static_files = warp::get().and(warp::fs::dir("www/static"));
 

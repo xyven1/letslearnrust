@@ -23,10 +23,10 @@ enum Request {
 }
 #[derive(Serialize, Debug)]
 #[serde(tag = "type")]
-enum Response {
+pub enum Response {
     #[serde(rename = "login")]
     Login {
-        success: bool,
+        user: User,
         message: String,
         status: String,
     },
@@ -38,6 +38,12 @@ pub struct Client {
     pub id: usize,
     pub topics: Vec<String>,
     pub sender: Option<mpsc::UnboundedSender<std::result::Result<Message, warp::Error>>>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct User {
+    pub username: String,
+    pub password: String,
 }
 
 pub async fn client_connection(ws: WebSocket, id: String, clients: Clients, mut client: Client) {
@@ -64,14 +70,15 @@ pub async fn client_connection(ws: WebSocket, id: String, clients: Clients, mut 
                 break;
             }
         };
-        client_msg(&id, msg, &clients).await;
+        message_handler(&id, msg, &clients).await;
     }
 
     unregister_client(&id, clients).await;
     println!("{} disconnected", id);
 }
 
-async fn client_msg(id: &str, msg: Message, clients: &Clients) {
+///handles incoming messages for a client
+async fn message_handler(id: &str, msg: Message, clients: &Clients) {
     println!("received message from {}: {:?}", id, msg);
     let message = match msg.to_str() {
         Ok(v) => v,
@@ -87,23 +94,14 @@ async fn client_msg(id: &str, msg: Message, clients: &Clients) {
     };
     match &request {
         Request::Chat { message, room } => {
-            let response = to_string(&Response::Message {
-                message: message.clone(),
-            })
-            .unwrap();
-            clients
-                .read()
-                .await
-                .iter()
-                .filter(|(_, client)| match &room {
-                    Some(v) => client.topics.contains(&v),
-                    None => true,
-                })
-                .for_each(|(_, client)| {
-                    if let Some(sender) = &client.sender {
-                        let _ = sender.send(Ok(Message::text(&response)));
-                    }
-                });
+            send_to_room(
+                clients,
+                room,
+                &Response::Message {
+                    message: message.clone(),
+                },
+            )
+            .await;
             println!(
                 "{} sent message to room {}",
                 id,
@@ -125,6 +123,7 @@ async fn client_msg(id: &str, msg: Message, clients: &Clients) {
     }
 }
 
+///regesters a client to the Client pool
 pub async fn register_client(id: String, clients: Clients) -> Client {
     let client = Client {
         id: 0,
@@ -135,6 +134,32 @@ pub async fn register_client(id: String, clients: Clients) -> Client {
     return client;
 }
 
+///unregesters a client from the Client pool
 pub async fn unregister_client(id: &String, clients: Clients) {
     clients.write().await.remove(id);
+}
+
+///sends a response to one client
+pub async fn send_to_client(client: &Client, response: &Response) {
+    if let Some(sender) = &client.sender {
+        let _ = sender.send(Ok(Message::text(to_string(&response).unwrap())));
+    }
+}
+
+///sends a response to all clients in a room. If room is left empty, sends to all clients
+pub async fn send_to_room(clients: &Clients, room: &Option<String>, response: &Response) {
+    let response = to_string(&response).unwrap();
+    clients
+        .read()
+        .await
+        .iter()
+        .filter(|(_, client)| match &room {
+            Some(v) => client.topics.contains(&v),
+            None => true,
+        })
+        .for_each(|(_, client)| {
+            if let Some(sender) = &client.sender {
+                let _ = sender.send(Ok(Message::text(&response)));
+            }
+        });
 }
