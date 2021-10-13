@@ -1,11 +1,12 @@
 use crate::Clients;
 use futures::{FutureExt, StreamExt};
+use redis::Commands;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
+use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use warp::ws::{Message, WebSocket};
-
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 enum Request {
@@ -26,9 +27,11 @@ enum Request {
 pub enum Response {
     #[serde(rename = "login")]
     Login {
-        user: User,
-        message: String,
-        status: String,
+        user: Option<User>,
+        message: Option<String>,
+        status: Option<String>,
+        #[serde(rename = "sessionID")]
+        session_id: Option<String>,
     },
     #[serde(rename = "message")]
     Message { message: String },
@@ -43,7 +46,6 @@ pub struct Client {
 #[derive(Serialize, Debug)]
 pub struct User {
     pub username: String,
-    pub password: String,
 }
 
 pub async fn client_connection(ws: WebSocket, id: String, clients: Clients, mut client: Client) {
@@ -79,7 +81,6 @@ pub async fn client_connection(ws: WebSocket, id: String, clients: Clients, mut 
 
 ///handles incoming messages for a client
 async fn message_handler(id: &str, msg: Message, clients: &Clients) {
-    println!("received message from {}: {:?}", id, msg);
     let message = match msg.to_str() {
         Ok(v) => v,
         Err(_) => return,
@@ -102,23 +103,65 @@ async fn message_handler(id: &str, msg: Message, clients: &Clients) {
                 },
             )
             .await;
-            println!(
-                "{} sent message to room {}",
-                id,
-                room.clone().unwrap_or("".to_string())
-            );
         }
         Request::Login { username, password } => {
-            //login
-            println!("{} logged in", username);
+            let client = clients.clone().read().await.get(id).unwrap().clone();
+            // let thing = local.get(id).unwrap(); //.read().await.get(id).unwrap();
+            let rdb = redis::Client::open("redis://127.0.0.1/").unwrap();
+            let mut conn = rdb.get_connection().unwrap();
+
+            let data: HashMap<String, String> = conn
+                .hgetall("user:".to_string() + &username.clone())
+                .unwrap();
+
+            if data.is_empty() {
+                send_to_client(
+                    &client,
+                    &Response::Login {
+                        message: Some("User does not exist".to_string()),
+                        status: None,
+                        user: None,
+                        session_id: None,
+                    },
+                )
+                .await;
+                return;
+            }
+            if data.get("password").unwrap() != password {
+                send_to_client(
+                    &client,
+                    &Response::Login {
+                        message: Some("Incorrect password".to_string()),
+                        status: None,
+                        user: None,
+                        session_id: None,
+                    },
+                )
+                .await;
+                return;
+            }
+            let session_id = uuid::Uuid::new_v4().to_string();
+            let key = "session:".to_string() + &session_id;
+            let _: () = conn.hset(&key, "username", &username).unwrap();
+            let _: () = conn.expire(&key, 6).unwrap();
+            send_to_client(
+                &client,
+                &Response::Login {
+                    user: Some(User {
+                        username: username.to_string(),
+                    }),
+                    status: Some("success".to_string()),
+                    message: None,
+                    session_id: Some(session_id),
+                },
+            )
+            .await;
         }
         Request::Register { username, password } => {
             //register
-            println!("{} registered", username);
         }
         Request::LoginWithID { id } => {
             //login with id
-            println!("{} logged in with id", id);
         }
     }
 }

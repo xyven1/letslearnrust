@@ -16,7 +16,7 @@ async fn main() {
     let clients: Clients = Arc::new(RwLock::new(HashMap::new()));
 
     match db::global_sub_key(clients.clone(), "test".to_string()).await {
-        Ok(_) => println!("Redis Channel Subcribed"),
+        Ok(_) => println!("Subbed to changes on test key"),
         Err(e) => println!("{}", e),
     };
 
@@ -31,7 +31,7 @@ async fn main() {
         .or(ws_route)
         .with(warp::cors().allow_any_origin());
 
-    warp::serve(routes).run(([127, 0, 0, 1], 8000)).await;
+    warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
 }
 
 fn with_clients(clients: Clients) -> impl Filter<Extract = (Clients,), Error = Infallible> + Clone {

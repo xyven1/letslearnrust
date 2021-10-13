@@ -20,7 +20,6 @@ pub async fn global_sub_key(clients: Clients, channel: String) -> RedisResult<()
                 },
             )
             .await;
-            println!("{:?}", msg);
         }
     });
     Ok(())
