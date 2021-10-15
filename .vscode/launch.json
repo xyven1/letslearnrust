@@ -5,16 +5,41 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "(Windows) Launch",
-      "type": "cppvsdbg",
+      "type": "lldb",
       "request": "launch",
-      "program": "${workspaceRoot}/target/debug/letslearnrust.exe",
+      "name": "Debug executable 'letslearnrust'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=letslearnrust",
+          "--package=letslearnrust"
+        ],
+        "filter": {
+          "name": "letslearnrust",
+          "kind": "bin"
+        }
+      },
       "args": [],
-      "stopAtEntry": false,
-      "cwd": "${workspaceRoot}",
-      "environment": [],
-      "console": "integratedTerminal",
-      "preLaunchTask": "cargo build"
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'letslearnrust'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=letslearnrust",
+          "--package=letslearnrust"
+        ],
+        "filter": {
+          "name": "letslearnrust",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
     }
   ]
 }
