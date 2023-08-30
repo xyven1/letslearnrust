@@ -13,8 +13,8 @@ pub async fn global_sub_key(clients: Clients, channel: String) -> RedisResult<()
     tokio::spawn(async move {
         while let Some(msg) = pubsub.on_message().next().await {
             send_to_room(
-                &clients,
-                &None,
+                clients.clone(),
+                None,
                 &Response::Message {
                     message: msg.get_payload().unwrap(),
                 },
@@ -35,7 +35,7 @@ pub async fn client_sub_key(client: Client, channel: String) -> RedisResult<()> 
     tokio::spawn(async move {
         while let Some(msg) = pubsub.on_message().next().await {
             send_to_client(
-                &client,
+                client.clone(),
                 &Response::Message {
                     message: msg.get_payload().unwrap(),
                 },

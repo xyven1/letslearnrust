@@ -16,17 +16,20 @@
 				case "login":
 					setCookie("sessionID", msg.sessionID, 1 / 1440)
 					setLog(msg.status == "success" ? "Successful login!" : msg.message)
-					user = {
-						username: msg.username,
-					}
-					break
+					user = msg.user
+          break
 				case "loginWithID":
-					user = {
-						username: msg.username,
-					}
+					user = msg.user
+          setLog(msg.message ? msg.message : "Successfully logged in with sessionID!")
 					break
 				case "register":
-					setLog(msg.message)
+          if(msg.user) {
+            setCookie("sessionID", msg.sessionID, 1 / 1440)
+            setLog("Successful registration!")
+            user = msg.user
+          } else if(msg.message)  {
+            setLog(msg.message)
+          }
 					break
 			}
 		}
@@ -49,6 +52,7 @@
 		function login() {
 			var sessionID = getCookie("sessionID")
 			if (sessionID) {
+        console.log("loginWithID")
 				sendData({
 					type: 'loginWithID',
 					sessionID
@@ -76,7 +80,7 @@
 			var log = document.getElementById("log");
 
 			document.getElementById("form").onsubmit = formSubmit
-		}
+    }
 	</script>
 </head>
 

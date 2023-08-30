@@ -11,6 +11,14 @@ async function initWS(){
     conn.onmessage = onMessage;
   } else console.log("<b>Your browser does not support WebSockets.</b>")
   console.log("initWS")
+  var sessionID = getCookie("sessionID")
+  if (sessionID) {
+    console.log("loginWithID")
+    sendData({
+      type: 'loginWithID',
+      sessionID
+    })
+  }
 }
 function sendData(data){
   conn.send(JSON.stringify(data))
@@ -34,6 +42,6 @@ function getCookie(name) {
   }
   return null;
 }
-function eraseCookie(name) {   
+function eraseCookie(name) {
   document.cookie = name +'=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
 }

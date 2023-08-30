@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use warp::{Filter, Rejection};
@@ -9,7 +8,7 @@ mod db;
 mod handler;
 
 type Result<T> = std::result::Result<T, Rejection>;
-type Clients = Arc<RwLock<HashMap<String, client::Client>>>;
+type Clients = Arc<RwLock<HashMap<uuid::Uuid, client::Client>>>;
 
 #[tokio::main]
 async fn main() {
@@ -20,11 +19,15 @@ async fn main() {
         Err(e) => println!("{}", e),
     };
 
+    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
+    let rdb = redis::aio::ConnectionManager::new(client.clone()).await.unwrap();
+
     let static_files = warp::get().and(warp::fs::dir("www/static"));
 
     let ws_route = warp::path("api")
         .and(warp::ws())
-        .and(with_clients(clients.clone()))
+        .and(warp::any().map(move || rdb.clone()))
+        .and(warp::any().map(move || clients.clone()))
         .and_then(handler::ws_handler);
 
     let routes = static_files
@@ -32,8 +35,4 @@ async fn main() {
         .with(warp::cors().allow_any_origin());
 
     warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
-}
-
-fn with_clients(clients: Clients) -> impl Filter<Extract = (Clients,), Error = Infallible> + Clone {
-    warp::any().map(move || clients.clone())
 }
