@@ -1,0 +1,26 @@
+config:
+  target: "ws://127.0.0.1:8080/api"
+  phases:
+    - duration: 30  # Test for 60 seconds
+      arrivalRate: 100 # Every second, add 100 users
+      maxVusers: 10000 # And ramp it up to 10000 users in total over the 60s period
+      name: "Ramping up the load"
+    - duration: 60 # Then resume the load test for 120s
+      arrivalRate: 100 # With those 100 users we ramped up to in the first phase
+      maxVusers: 10000 # And keep it steady at 100 users
+      name: "Pushing a constant load"
+
+scenarios:
+  - engine: ws
+    flow:
+      - send:
+          type: login
+          username: asdf
+          password: asdfasdf
+      - think: 1
+      - loop:
+          - send:
+              type: message
+              message: Test
+          - think: 1
+        count: 15
